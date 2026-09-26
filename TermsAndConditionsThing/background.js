@@ -49,7 +49,7 @@ async function handleAudit(targetUrl, language) {
   }
 
   // 5. Send to Gemini if not cached
-  const apiUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-3.8-flash:generateContent?key=${"AQ.Ab8RN6K2dw3Pz9D7TjfMbBcy4eWadnjkU6etJ1FsMv4NPrvgHg"}`;
+  const apiUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${"AQ.Ab8RN6K2dw3Pz9D7TjfMbBcy4eWadnjkU6etJ1FsMv4NPrvgHg"}`;
 
   const promptText = `You are a consumer rights assistant. Read this Terms of Service/Privacy agreement:
 ${cleanText}
