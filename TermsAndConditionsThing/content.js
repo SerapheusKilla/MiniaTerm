@@ -128,7 +128,7 @@ function showModal(initialText) {
 
   modal.innerHTML = `
     <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px;border-bottom:1px solid #334155;padding-bottom:10px;">
-      <strong style="font-size:14px;color:#f8fafc;">🛡️ Legal Audit</strong>
+      <strong style="font-size:14px;color:#f8fafc;">🛡️ MiniaTerm</strong>
       
       <div style="display:flex;align-items:center;gap:8px;">
         <select id="tc-lang-select" style="background:#1e293b;color:#f8fafc;border:1px solid #475569;border-radius:6px;font-size:11px;padding:3px 6px;cursor:pointer;">
