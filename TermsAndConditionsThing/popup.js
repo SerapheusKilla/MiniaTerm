@@ -1,7 +1,7 @@
 // Function that runs directly inside the active webpage
 function scanPageForLegalLinks() {
   const termsKeywords = ['terms of service', 'terms and conditions', 'terms of use', 'tos', 'terms', 'conditions', 'user agreement', 'user terms' ];
-  const privacyKeywords = ['privacy policy', 'privacy notice', 'privacy statement'];
+  const privacyKeywords = ['privacy policy', 'privacy notice', 'privacy statement', 'privacy', 'data protection', 'data privacy'];
 
   const allLinks = Array.from(document.querySelectorAll('a'));
   let termsUrl = null;
