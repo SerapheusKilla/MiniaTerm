@@ -2,27 +2,48 @@ let currentTargetUrl = null;
 let currentHref = location.href;
 let debounceTimer = null;
 
-// 1. Detect if this is an auth page OR a policy update banner
+// Helper: Recursively search both regular DOM and Shadow Roots (Reddit, Web Components)
+function deepQuerySelectorAll(selector, root = document) {
+  let results = Array.from(root.querySelectorAll(selector));
+  const walker = document.createTreeWalker(root, NodeFilter.SHOW_ELEMENT);
+
+  let node;
+  while ((node = walker.nextNode())) {
+    if (node.shadowRoot) {
+      results = results.concat(deepQuerySelectorAll(selector, node.shadowRoot));
+    }
+  }
+  return results;
+}
+
+// 1. Detect if this is an auth page, dynamic modal, or policy update
 function hasLegalPrompt() {
-  const hasPasswordField = document.querySelector('input[type="password"]') !== null;
+  // Check for password inputs across both regular and Shadow DOM
+  const hasPasswordField = deepQuerySelectorAll('input[type="password"]').length > 0;
   if (hasPasswordField) return true;
 
+  // Check URL paths and query parameters common to auth modals
+  const pathname = window.location.pathname.toLowerCase();
+  const search = window.location.search.toLowerCase();
   const authUrlPatterns = [
     '/signup', '/sign-up', '/register', '/join', 
     '/login', '/signin', '/sign-in', '/auth', 
-    '/create-account', 'creating-your-account', 
-    'account-setup', 'account-creation', 'new-account', 'register-now'
+    '/create-account', 'account-setup', 'register-now'
   ];
-  const pathname = window.location.pathname.toLowerCase();
-  const matchesAuthUrl = authUrlPatterns.some(route => pathname.includes(route));
-  
-  const hasEmailOrUserInput = document.querySelector(
+  const matchesAuthUrl = authUrlPatterns.some(route => pathname.includes(route) || search.includes(route));
+
+  // Check for user/email inputs across regular and Shadow DOM
+  const hasEmailOrUserInput = deepQuerySelectorAll(
     'input[type="email"], input[name*="user"], input[name*="email"], input[id*="email"], input[id*="user"]'
-  ) !== null;
+  ).length > 0;
 
   if (matchesAuthUrl && hasEmailOrUserInput) return true;
 
-  // Use textContent instead of innerText for 10x faster non-blocking reads
+  // Check for Reddit & common SPA custom modal tags
+  const modalTags = ['auth-flow-modal', 'reddit-auth', 'faceplate-modal', 'shreddit-async-loader'];
+  if (modalTags.some(tag => document.querySelector(tag) !== null)) return true;
+
+  // Check for policy update notices
   const pageText = (document.body ? document.body.textContent : "").toLowerCase();
   const updatePhrases = [
     "updated our terms",
@@ -37,22 +58,31 @@ function hasLegalPrompt() {
   return updatePhrases.some(phrase => pageText.includes(phrase));
 }
 
-// 2. Scan the page for Terms or Privacy links
+// 2. Scan regular DOM and Shadow Roots for legal links
 function scanLegalLinks() {
-  const links = Array.from(document.querySelectorAll('a'));
+  const links = deepQuerySelectorAll('a');
   let termsUrl = null;
   let privacyUrl = null;
 
   for (const link of links) {
     const text = (link.textContent || '').toLowerCase().trim();
-    const href = link.href;
+    const href = link.href || '';
 
     if (!href || href.startsWith('javascript:') || href === '#') continue;
 
-    if (!termsUrl && (text.includes('terms') || text.includes('conditions') || text.includes('tos') || text.includes('user agreement'))) {
+    if (!termsUrl && (
+      text.includes('user agreement') || 
+      text.includes('terms') || 
+      text.includes('conditions') || 
+      text.includes('tos')
+    )) {
       termsUrl = href;
     }
-    if (!privacyUrl && (text.includes('privacy policy') || text.includes('privacy'))) {
+
+    if (!privacyUrl && (
+      text.includes('privacy policy') || 
+      text.includes('privacy')
+    )) {
       privacyUrl = href;
     }
   }
@@ -60,7 +90,7 @@ function scanLegalLinks() {
   return { termsUrl, privacyUrl };
 }
 
-// 3. Main runner (safely wrapped without disconnecting the observer)
+// 3. Main runner
 function checkAndTrigger() {
   if (!hasLegalPrompt()) return;
   if (document.getElementById('tc-audit-modal')) return;
@@ -171,10 +201,10 @@ function debouncedCheck() {
   }, 400);
 }
 
-// Initial scan on script load
+// Initial scan
 debouncedCheck();
 
-// Watch for dynamic DOM elements appearing (React/Vue auth modals)
+// Watch for DOM changes (modals appearing, inputs rendering)
 const observer = new MutationObserver(() => {
   debouncedCheck();
 });
@@ -184,7 +214,7 @@ observer.observe(document.body || document.documentElement, {
   subtree: true
 });
 
-// Watch for client-side SPA route shifts (URL changes without hard reloads)
+// Watch for client-side routing changes (e.g. Next.js / React)
 setInterval(() => {
   if (location.href !== currentHref) {
     currentHref = location.href;
