@@ -1,5 +1,6 @@
 let currentTargetUrl = null;
-let observer = null;
+let currentHref = location.href;
+let debounceTimer = null;
 
 // 1. Detect if this is an auth page OR a policy update banner
 function hasLegalPrompt() {
@@ -8,18 +9,21 @@ function hasLegalPrompt() {
 
   const authUrlPatterns = [
     '/signup', '/sign-up', '/register', '/join', 
-    '/login', '/signin', '/sign-in', '/auth', '/create-account', 'creating-your-account', 'account-setup', 'account-creation', 'new-account', 'register-now'
+    '/login', '/signin', '/sign-in', '/auth', 
+    '/create-account', 'creating-your-account', 
+    'account-setup', 'account-creation', 'new-account', 'register-now'
   ];
   const pathname = window.location.pathname.toLowerCase();
   const matchesAuthUrl = authUrlPatterns.some(route => pathname.includes(route));
+  
   const hasEmailOrUserInput = document.querySelector(
     'input[type="email"], input[name*="user"], input[name*="email"], input[id*="email"], input[id*="user"]'
   ) !== null;
 
   if (matchesAuthUrl && hasEmailOrUserInput) return true;
 
-  // Check for "We've updated our terms" style text
-  const pageText = document.body ? document.body.innerText.toLowerCase() : "";
+  // Use textContent instead of innerText for 10x faster non-blocking reads
+  const pageText = (document.body ? document.body.textContent : "").toLowerCase();
   const updatePhrases = [
     "updated our terms",
     "updated our privacy",
@@ -40,7 +44,7 @@ function scanLegalLinks() {
   let privacyUrl = null;
 
   for (const link of links) {
-    const text = (link.innerText || '').toLowerCase().trim();
+    const text = (link.textContent || '').toLowerCase().trim();
     const href = link.href;
 
     if (!href || href.startsWith('javascript:') || href === '#') continue;
@@ -56,18 +60,16 @@ function scanLegalLinks() {
   return { termsUrl, privacyUrl };
 }
 
-// 3. Main runner
+// 3. Main runner (safely wrapped without disconnecting the observer)
 function checkAndTrigger() {
   if (!hasLegalPrompt()) return;
   if (document.getElementById('tc-audit-modal')) return;
 
   const { termsUrl, privacyUrl } = scanLegalLinks();
-  currentTargetUrl = termsUrl || privacyUrl;
+  const detectedUrl = termsUrl || privacyUrl;
 
-  if (currentTargetUrl) {
-    if (observer) {
-      observer.disconnect();
-    }
+  if (detectedUrl) {
+    currentTargetUrl = detectedUrl;
     showModal("⏳ Automatically analyzing Terms & Conditions...");
     requestAudit(currentTargetUrl, "English");
   }
@@ -104,6 +106,8 @@ function updateModal(text) {
 
 // 5. Injected Floating Card UI
 function showModal(initialText) {
+  if (document.getElementById('tc-audit-modal')) return;
+
   const modal = document.createElement('div');
   modal.id = 'tc-audit-modal';
 
@@ -159,15 +163,33 @@ function showModal(initialText) {
   });
 }
 
-// 6. Start listening
-checkAndTrigger();
+// 6. Debounced continuous listeners
+function debouncedCheck() {
+  clearTimeout(debounceTimer);
+  debounceTimer = setTimeout(() => {
+    checkAndTrigger();
+  }, 400);
+}
 
-// Watch for dynamic elements rendering later (SPAs like React/Vue)
-observer = new MutationObserver(() => {
-  checkAndTrigger();
+// Initial scan on script load
+debouncedCheck();
+
+// Watch for dynamic DOM elements appearing (React/Vue auth modals)
+const observer = new MutationObserver(() => {
+  debouncedCheck();
 });
 
 observer.observe(document.body || document.documentElement, {
   childList: true,
   subtree: true
 });
+
+// Watch for client-side SPA route shifts (URL changes without hard reloads)
+setInterval(() => {
+  if (location.href !== currentHref) {
+    currentHref = location.href;
+    const existingModal = document.getElementById('tc-audit-modal');
+    if (existingModal) existingModal.remove();
+    debouncedCheck();
+  }
+}, 500);
