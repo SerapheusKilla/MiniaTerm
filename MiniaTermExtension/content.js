@@ -8,7 +8,7 @@ function hasLegalPrompt() {
 
   const authUrlPatterns = [
     '/signup', '/sign-up', '/register', '/join', 
-    '/login', '/signin', '/sign-in', '/auth', '/create-account'
+    '/login', '/signin', '/sign-in', '/auth', '/create-account', 'creating-your-account', 'account-setup', 'account-creation', 'new-account', 'register-now'
   ];
   const pathname = window.location.pathname.toLowerCase();
   const matchesAuthUrl = authUrlPatterns.some(route => pathname.includes(route));
